@@ -71,7 +71,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onEnter }) => {
           <div
             key={i}
             className="absolute w-2 h-2 rounded-full opacity-30 animate-ping"
-            style={{ backgroundColor: currentTheme.colors.primary }}
             style={{
               backgroundColor: currentTheme.colors.primary,
               left: `${Math.random() * 100}%`,

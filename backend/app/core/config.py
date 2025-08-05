@@ -3,7 +3,11 @@ Configuration management for the Neural Network API
 """
 import os
 from typing import List, Optional
-from pydantic import BaseSettings, validator
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseSettings
+from pydantic import validator
 from functools import lru_cache
 
 

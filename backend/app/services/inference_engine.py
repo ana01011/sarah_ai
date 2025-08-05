@@ -13,7 +13,10 @@ from contextlib import asynccontextmanager
 
 import torch
 import torch.nn.functional as F
-from torch.amp import autocast
+try:
+    from torch.amp import autocast
+except ImportError:
+    from torch.cuda.amp import autocast
 import redis
 import json
 import pickle
@@ -317,7 +320,7 @@ class InferenceEngine:
             # Generate response
             with torch.no_grad():
                 if self.use_mixed_precision:
-                    with autocast(device_type='cuda'):
+                    with autocast():
                         generated_ids = self.model.generate(
                             input_ids,
                             max_length=request.max_length,
