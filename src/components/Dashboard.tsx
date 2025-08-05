@@ -8,6 +8,7 @@ import { PerformanceChart } from './PerformanceChart';
 import { SystemStatus } from './SystemStatus';
 import { ProcessingPipeline } from './ProcessingPipeline';
 import { AIChat } from './AIChat';
+import { apiService, type MetricsResponse, type NeuralNetworkMetrics, type ProcessingPipelineMetrics } from '../services/api';
 
 interface DashboardProps {
   onBackToWelcome?: () => void;
@@ -27,27 +28,80 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBackToWelcome }) => {
     memoryUsage: 65,
     activeModels: 12
   });
+  const [metrics, setMetrics] = useState<MetricsResponse | null>(null);
+  const [neuralNetworkMetrics, setNeuralNetworkMetrics] = useState<NeuralNetworkMetrics | null>(null);
+  const [processingPipelineMetrics, setProcessingPipelineMetrics] = useState<ProcessingPipelineMetrics | null>(null);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
+  const [backendError, setBackendError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     
-    // Simulate real-time metrics updates
-    const metricsTimer = setInterval(() => {
-      setAiMetrics(prev => ({
-        accuracy: prev.accuracy + (Math.random() - 0.5) * 0.2,
-        throughput: prev.throughput + Math.floor((Math.random() - 0.5) * 100),
-        latency: Math.max(8, prev.latency + (Math.random() - 0.5) * 2),
-        gpuUtilization: Math.max(0, Math.min(100, prev.gpuUtilization + (Math.random() - 0.5) * 5)),
-        memoryUsage: Math.max(0, Math.min(100, prev.memoryUsage + (Math.random() - 0.5) * 3)),
-        activeModels: prev.activeModels + Math.floor((Math.random() - 0.5) * 2)
-      }));
+    // Check backend connection and load initial data
+    const checkBackendConnection = async () => {
+      try {
+        const health = await apiService.checkHealth();
+        setIsBackendConnected(true);
+        setBackendError(null);
+        
+        // Load initial metrics
+        const dashboardData = await apiService.getDashboardData();
+        setMetrics(dashboardData.performance);
+        setNeuralNetworkMetrics(dashboardData.neural_network);
+        setProcessingPipelineMetrics(dashboardData.processing_pipeline);
+        
+        // Update AI metrics from backend
+        setAiMetrics({
+          accuracy: dashboardData.performance.ai.accuracy,
+          throughput: dashboardData.performance.ai.throughput,
+          latency: dashboardData.performance.ai.latency,
+          gpuUtilization: dashboardData.performance.ai.gpu_utilization,
+          memoryUsage: dashboardData.performance.ai.memory_usage,
+          activeModels: dashboardData.performance.ai.active_models
+        });
+      } catch (error) {
+        console.error('Backend connection failed:', error);
+        setIsBackendConnected(false);
+        setBackendError('Backend connection failed. Using simulated data.');
+      }
+    };
+    
+    checkBackendConnection();
+    
+    // Real-time metrics updates
+    const metricsTimer = setInterval(async () => {
+      if (isBackendConnected) {
+        try {
+          const realtimeMetrics = await apiService.getRealtimeMetrics();
+          setAiMetrics({
+            accuracy: realtimeMetrics.ai.accuracy,
+            throughput: realtimeMetrics.ai.throughput,
+            latency: realtimeMetrics.ai.latency,
+            gpuUtilization: realtimeMetrics.ai.gpu_utilization,
+            memoryUsage: realtimeMetrics.ai.memory_usage,
+            activeModels: realtimeMetrics.ai.active_models
+          });
+        } catch (error) {
+          console.error('Failed to fetch real-time metrics:', error);
+        }
+      } else {
+        // Fallback to simulated data
+        setAiMetrics(prev => ({
+          accuracy: prev.accuracy + (Math.random() - 0.5) * 0.2,
+          throughput: prev.throughput + Math.floor((Math.random() - 0.5) * 100),
+          latency: Math.max(8, prev.latency + (Math.random() - 0.5) * 2),
+          gpuUtilization: Math.max(0, Math.min(100, prev.gpuUtilization + (Math.random() - 0.5) * 5)),
+          memoryUsage: Math.max(0, Math.min(100, prev.memoryUsage + (Math.random() - 0.5) * 3)),
+          activeModels: prev.activeModels + Math.floor((Math.random() - 0.5) * 2)
+        }));
+      }
     }, 2000);
 
     return () => {
       clearInterval(timer);
       clearInterval(metricsTimer);
     };
-  }, []);
+  }, [isBackendConnected]);
 
   const handleNotificationClick = () => {
     setNotifications(0);

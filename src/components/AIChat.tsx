@@ -30,6 +30,7 @@ import {
   Shield,
   Star
 } from 'lucide-react';
+import { apiService } from '../services/api';
 
 interface Message {
   id: string;
@@ -111,35 +112,27 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate AI response with more variety
-    setTimeout(() => {
-      const aiResponses = [
-        {
-          content: "I've analyzed your request and found some interesting insights! 🚀 Your GPU utilization is at 78% with excellent model performance. The neural networks are processing data efficiently with 94.7% accuracy. I've also detected optimization opportunities that could boost performance by 15%.",
-          suggestions: ["📊 Show detailed metrics", "⚡ Apply optimizations", "📋 Export report", "🔧 Schedule maintenance"]
-        },
-        {
-          content: "you mean my font? haha what do you think it is not good or do you have a better suggestion?",
-          suggestions: ["🚀 change font", "📈 View font details", " suggest a font", "💾 upload a new font"]
-        },
-        {
-          content: "I'm monitoring 12 active models across your GPU clusters. 🧠 Model accuracy has improved by 2.3% over the last hour! The transformer models are showing particularly strong performance. Would you like me to generate a detailed performance report or suggest parameter adjustments?",
-          suggestions: ["📊 Generate report", "🔧 Adjust parameters", "⚖️ Compare models", "🎯 Set alerts"]
-        },
-        {
-          content: "Great! I can help you with code generation. 💻 What type of code would you like me to create? I can generate Python scripts for data processing, neural network architectures, API endpoints, or even complete applications. Just describe what you need!",
-          suggestions: ["🐍 Python scripts", "🧠 Neural networks", "🌐 API endpoints", "📱 Full applications"]
-        }
-      ];
+    try {
+      // Send request to backend
+      const response = await apiService.generateConversation({
+        prompt: inputValue,
+        max_length: 2048,
+        temperature: 0.7,
+        top_p: 0.9,
+        top_k: 50
+      });
 
-      const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
-      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: randomResponse.content,
+        content: response.text,
         sender: 'ai',
         timestamp: new Date(),
-        suggestions: randomResponse.suggestions,
+        suggestions: [
+          "📊 Show detailed metrics",
+          "⚡ Apply optimizations", 
+          "📋 Export report",
+          "🔧 Schedule maintenance"
+        ],
         reactions: [
           { type: '👍', count: 0 },
           { type: '❤️', count: 0 },
@@ -150,7 +143,27 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
       setMessages(prev => [...prev, aiMessage]);
       setIsTyping(false);
       playSound('receive');
-    }, 1500);
+    } catch (error) {
+      console.error('Failed to generate response:', error);
+      
+      // Fallback response
+      const fallbackMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I apologize, but I'm having trouble connecting to the AI model right now. Please try again in a moment, or check if the backend service is running.",
+        sender: 'ai',
+        timestamp: new Date(),
+        suggestions: ["🔄 Try again", "📊 Check system status", "🔧 Restart service"],
+        reactions: [
+          { type: '👍', count: 0 },
+          { type: '❤️', count: 0 },
+          { type: '🚀', count: 0 }
+        ]
+      };
+
+      setMessages(prev => [...prev, fallbackMessage]);
+      setIsTyping(false);
+      playSound('receive');
+    }
   };
 
   const handleSuggestionClick = (suggestion: string) => {
