@@ -30,6 +30,7 @@ import {
   Shield,
   Star
 } from 'lucide-react';
+import { neuralNetworkAPI, formatProcessingTime } from '../services/api';
 
 interface Message {
   id: string;
@@ -40,6 +41,11 @@ interface Message {
   suggestions?: string[];
   attachments?: string[];
   reactions?: { type: string; count: number }[];
+  metadata?: {
+    processing_time?: number;
+    tokens_generated?: number;
+    model_info?: any;
+  };
 }
 
 interface AIChatProps {
@@ -51,16 +57,16 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: "Hello! I'm Sarah, your advanced AI assistant. I can help you with system monitoring, data analysis, model optimization, code generation, and much more. What would you like to explore today?",
+      content: "Hello! I'm your advanced Neural Network AI assistant. I'm powered by a transformer-based architecture optimized for contextual conversations. I can help you with complex reasoning, code generation, analysis, and much more. What would you like to discuss today?",
       sender: 'ai',
       timestamp: new Date(),
       suggestions: [
-        "🚀 Show me system performance",
-        "📊 Analyze model accuracy trends", 
-        "⚡ Check GPU utilization",
-        "🔧 Optimize training pipeline",
-        "💡 Generate code snippets",
-        "📈 Create performance reports"
+        "🧠 Tell me about your architecture",
+        "📊 Show system performance", 
+        "⚡ Generate some code",
+        "🔧 Help with analysis",
+        "💡 Creative writing",
+        "📈 Technical explanations"
       ]
     }
   ]);
@@ -69,8 +75,10 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
   const [isListening, setIsListening] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [selectedModel, setSelectedModel] = useState('GPT-4 Turbo');
+  const [selectedModel, setSelectedModel] = useState('NeuralChatModel');
   const [chatTheme, setChatTheme] = useState('dark');
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +94,26 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  // Check backend connection status
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        await neuralNetworkAPI.getStatus();
+        setIsConnected(true);
+      } catch (error) {
+        console.error('Backend connection failed:', error);
+        setIsConnected(false);
+      }
+    };
+
+    if (isOpen) {
+      checkConnection();
+      // Check connection every 30 seconds
+      const interval = setInterval(checkConnection, 30000);
+      return () => clearInterval(interval);
     }
   }, [isOpen]);
 
@@ -108,49 +136,70 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputValue;
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate AI response with more variety
-    setTimeout(() => {
-      const aiResponses = [
-        {
-          content: "I've analyzed your request and found some interesting insights! 🚀 Your GPU utilization is at 78% with excellent model performance. The neural networks are processing data efficiently with 94.7% accuracy. I've also detected optimization opportunities that could boost performance by 15%.",
-          suggestions: ["📊 Show detailed metrics", "⚡ Apply optimizations", "📋 Export report", "🔧 Schedule maintenance"]
-        },
-        {
-          content: "you mean my font? haha what do you think it is not good or do you have a better suggestion?",
-          suggestions: ["🚀 change font", "📈 View font details", " suggest a font", "💾 upload a new font"]
-        },
-        {
-          content: "I'm monitoring 12 active models across your GPU clusters. 🧠 Model accuracy has improved by 2.3% over the last hour! The transformer models are showing particularly strong performance. Would you like me to generate a detailed performance report or suggest parameter adjustments?",
-          suggestions: ["📊 Generate report", "🔧 Adjust parameters", "⚖️ Compare models", "🎯 Set alerts"]
-        },
-        {
-          content: "Great! I can help you with code generation. 💻 What type of code would you like me to create? I can generate Python scripts for data processing, neural network architectures, API endpoints, or even complete applications. Just describe what you need!",
-          suggestions: ["🐍 Python scripts", "🧠 Neural networks", "🌐 API endpoints", "📱 Full applications"]
-        }
-      ];
+    try {
+      // Send message to neural network backend
+      const response = await neuralNetworkAPI.sendMessage({
+        message: currentInput,
+        conversation_id: conversationId,
+        max_length: 512,
+        temperature: 0.7,
+        top_k: 50,
+        top_p: 0.9,
+        repetition_penalty: 1.1
+      });
 
-      const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
-      
+      // Update conversation ID if new
+      if (!conversationId) {
+        setConversationId(response.conversation_id);
+      }
+
       const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: randomResponse.content,
+        id: response.request_id,
+        content: response.message,
         sender: 'ai',
-        timestamp: new Date(),
-        suggestions: randomResponse.suggestions,
+        timestamp: new Date(response.timestamp),
+        suggestions: [
+          "📊 Show model metrics",
+          "⚡ Optimize performance", 
+          "🔧 Adjust parameters",
+          "💡 Get suggestions"
+        ],
         reactions: [
           { type: '👍', count: 0 },
           { type: '❤️', count: 0 },
           { type: '🚀', count: 0 }
-        ]
+        ],
+        metadata: {
+          processing_time: response.processing_time,
+          tokens_generated: response.tokens_generated,
+          model_info: response.model_info
+        }
       };
 
       setMessages(prev => [...prev, aiMessage]);
       setIsTyping(false);
       playSound('receive');
-    }, 1500);
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Show error message
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: "I apologize, but I'm having trouble connecting to the neural network. Please check your connection and try again. 🔧",
+        sender: 'ai',
+        timestamp: new Date(),
+        suggestions: ["🔄 Retry", "🛠️ Check status", "📞 Contact support"]
+      };
+
+      setMessages(prev => [...prev, errorMessage]);
+      setIsTyping(false);
+      playSound('notification');
+    }
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -251,12 +300,14 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
                   Sarah AI Assistant
                 </h2>
                 <div className="flex items-center space-x-2 sm:space-x-3">
-                  <div className="flex items-center space-x-1 text-emerald-400">
-                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
-                    <span className="text-xs sm:text-sm font-medium">Online • {selectedModel}</span>
+                  <div className={`flex items-center space-x-1 ${isConnected ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`}></div>
+                    <span className="text-xs sm:text-sm font-medium">
+                      {isConnected ? 'Connected' : 'Disconnected'} • {selectedModel}
+                    </span>
                   </div>
                   <div className="text-xs text-slate-400 bg-white/10 px-2 py-1 rounded-full hidden sm:block">
-                    Advanced Mode
+                    Neural Network
                   </div>
                 </div>
               </div>
@@ -320,13 +371,21 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
                         <Brain className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
                         <div className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full"></div>
                       </div>
-                      <span className="text-xs sm:text-sm text-slate-400 font-medium">Sarah AI</span>
+                      <span className="text-xs sm:text-sm text-slate-400 font-medium">Neural AI</span>
                       <span className="text-xs text-slate-500">
                         {message.timestamp.toLocaleTimeString()}
                       </span>
+                      {message.metadata?.processing_time && (
+                        <div className="flex items-center space-x-1">
+                          <Zap className="w-3 h-3 text-emerald-400" />
+                          <span className="text-xs text-emerald-400">
+                            {formatProcessingTime(message.metadata.processing_time)}
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center space-x-1 hidden sm:flex">
-                        <Star className="w-3 h-3 text-amber-400" />
-                        <span className="text-xs text-amber-400">Premium</span>
+                        <Brain className="w-3 h-3 text-blue-400" />
+                        <span className="text-xs text-blue-400">Neural</span>
                       </div>
                     </div>
                   )}

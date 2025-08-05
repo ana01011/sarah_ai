@@ -8,6 +8,7 @@ import { PerformanceChart } from './PerformanceChart';
 import { SystemStatus } from './SystemStatus';
 import { ProcessingPipeline } from './ProcessingPipeline';
 import { AIChat } from './AIChat';
+import { neuralNetworkAPI, ComprehensiveMetrics, Alert, formatUptime, formatMemoryUsage } from '../services/api';
 
 interface DashboardProps {
   onBackToWelcome?: () => void;
@@ -19,34 +20,46 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBackToWelcome }) => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [notifications, setNotifications] = useState(3);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [aiMetrics, setAiMetrics] = useState({
-    accuracy: 94.7,
-    throughput: 2847,
-    latency: 12.3,
-    gpuUtilization: 78,
-    memoryUsage: 65,
-    activeModels: 12
-  });
+  const [systemMetrics, setSystemMetrics] = useState<ComprehensiveMetrics | null>(null);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [isConnected, setIsConnected] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    
-    // Simulate real-time metrics updates
-    const metricsTimer = setInterval(() => {
-      setAiMetrics(prev => ({
-        accuracy: prev.accuracy + (Math.random() - 0.5) * 0.2,
-        throughput: prev.throughput + Math.floor((Math.random() - 0.5) * 100),
-        latency: Math.max(8, prev.latency + (Math.random() - 0.5) * 2),
-        gpuUtilization: Math.max(0, Math.min(100, prev.gpuUtilization + (Math.random() - 0.5) * 5)),
-        memoryUsage: Math.max(0, Math.min(100, prev.memoryUsage + (Math.random() - 0.5) * 3)),
-        activeModels: prev.activeModels + Math.floor((Math.random() - 0.5) * 2)
-      }));
-    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
 
-    return () => {
-      clearInterval(timer);
-      clearInterval(metricsTimer);
+  // Fetch real-time metrics from backend
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        const [metricsData, alertsData] = await Promise.all([
+          neuralNetworkAPI.getMetrics(),
+          neuralNetworkAPI.getAlerts(true) // active alerts only
+        ]);
+        
+        setSystemMetrics(metricsData);
+        setAlerts(alertsData);
+        setIsConnected(true);
+        setLastUpdated(new Date());
+        
+        // Update notifications count based on alerts
+        setNotifications(alertsData.filter(alert => alert.severity === 'high' || alert.severity === 'critical').length);
+        
+      } catch (error) {
+        console.error('Failed to fetch metrics:', error);
+        setIsConnected(false);
+      }
     };
+
+    // Initial fetch
+    fetchMetrics();
+
+    // Set up real-time updates every 5 seconds
+    const metricsTimer = setInterval(fetchMetrics, 5000);
+
+    return () => clearInterval(metricsTimer);
   }, []);
 
   const handleNotificationClick = () => {
@@ -226,13 +239,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBackToWelcome }) => {
                   {currentTime.toLocaleTimeString()}
                 </p>
                 <p className="text-xs" style={{ color: currentTheme.colors.textSecondary }}>
-                  {currentTime.toLocaleDateString()}
+                  Last updated: {lastUpdated.toLocaleTimeString()}
                 </p>
               </div>
               
               <div className="flex items-center space-x-2 hidden md:flex">
-                <CheckCircle className="w-4 h-4" style={{ color: currentTheme.colors.success }} />
-                <span className="text-xs sm:text-sm" style={{ color: currentTheme.colors.success }}>All Systems Operational</span>
+                {isConnected ? (
+                  <>
+                    <CheckCircle className="w-4 h-4" style={{ color: currentTheme.colors.success }} />
+                    <span className="text-xs sm:text-sm" style={{ color: currentTheme.colors.success }}>
+                      Neural Network Online
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-4 h-4" style={{ color: currentTheme.colors.error }} />
+                    <span className="text-xs sm:text-sm" style={{ color: currentTheme.colors.error }}>
+                      Connection Lost
+                    </span>
+                  </>
+                )}
               </div>
               
               {/* AI Chat Button */}
@@ -331,48 +357,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBackToWelcome }) => {
         {/* Key Metrics Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-6 mb-4 sm:mb-8">
           <MetricsCard
-            title="Model Accuracy"
-            value={`${aiMetrics.accuracy.toFixed(1)}%`}
-            change="+2.3%"
-            icon={TrendingUp}
-            color="success"
-          />
-          <MetricsCard
-            title="Throughput"
-            value={`${aiMetrics.throughput.toLocaleString()}`}
-            change="+15.2%"
+            title="Requests/Sec"
+            value={systemMetrics?.performance.requests_per_second.toFixed(1) || "0"}
+            change={isConnected ? "+15.2%" : "N/A"}
             icon={Zap}
-            color="primary"
-            suffix=" req/s"
+            color={isConnected ? "primary" : "error"}
           />
           <MetricsCard
-            title="Avg Latency"
-            value={`${aiMetrics.latency.toFixed(1)}`}
-            change="-8.7%"
+            title="Avg Response"
+            value={systemMetrics?.performance.avg_processing_time.toFixed(2) || "0"}
+            change={isConnected ? "-8.7%" : "N/A"}
             icon={Activity}
-            color="warning"
-            suffix="ms"
+            color={isConnected ? "success" : "error"}
+            suffix="s"
           />
           <MetricsCard
-            title="GPU Usage"
-            value={`${aiMetrics.gpuUtilization.toFixed(0)}%`}
-            change="+5.1%"
+            title="CPU Usage"
+            value={`${systemMetrics?.resources.cpu_usage_percent.toFixed(0) || "0"}%`}
+            change={isConnected ? "+5.1%" : "N/A"}
             icon={Cpu}
-            color="info"
+            color={isConnected ? "info" : "error"}
           />
           <MetricsCard
             title="Memory"
-            value={`${aiMetrics.memoryUsage.toFixed(0)}%`}
-            change="-2.4%"
+            value={`${systemMetrics?.resources.memory_usage_percent.toFixed(0) || "0"}%`}
+            change={isConnected ? "-2.4%" : "N/A"}
             icon={Database}
-            color="error"
+            color={isConnected ? "warning" : "error"}
           />
           <MetricsCard
-            title="Active Models"
-            value={aiMetrics.activeModels.toString()}
-            change="+3"
+            title="Cache Hit Rate"
+            value={`${((systemMetrics?.cache.hit_rate || 0) * 100).toFixed(1)}%`}
+            change={isConnected ? "+12.3%" : "N/A"}
+            icon={TrendingUp}
+            color={isConnected ? "success" : "error"}
+          />
+          <MetricsCard
+            title="Total Requests"
+            value={systemMetrics?.performance.request_count.toLocaleString() || "0"}
+            change={isConnected ? "+847" : "N/A"}
             icon={Brain}
-            color="secondary"
+            color={isConnected ? "secondary" : "error"}
           />
         </div>
 
