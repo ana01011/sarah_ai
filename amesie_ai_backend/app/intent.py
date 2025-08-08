@@ -1,9 +1,11 @@
 from typing import List, Tuple
 import os
+import httpx
+import json
 
 class IntentDetector:
     """
-    Pluggable intent detection. Uses LLM if available, falls back to keyword-based.
+    Pluggable intent detection. Uses Mistral LLM if available, falls back to keyword-based.
     """
     def __init__(self):
         self.intent_map = {
@@ -26,22 +28,54 @@ class IntentDetector:
             "CDAO": ["digital", "analytics", "transformation", "ai", "machine learning", "automation"],
             "AI Assistant": ["assistant", "help", "general", "ai", "sarah", "question", "info", "support"],
         }
-        self.llm_api_key = os.getenv("LLM_INTENT_API_KEY")  # Set this for OpenAI/Mistral
+        self.llm_api_key = os.getenv("MISTRAL_API_KEY")
+        self.llm_url = os.getenv("MISTRAL_API_URL", "https://api.mistral.ai/v1/chat/completions")
+        self.llm_model = os.getenv("MISTRAL_INTENT_MODEL", "mistral-tiny")
 
     async def detect_llm(self, message: str) -> List[Tuple[str, float]]:
         """
-        Use LLM API for intent detection. Returns [(role, confidence)].
-        Stub: Replace with actual OpenAI/Mistral API call.
+        Use Mistral LLM API for intent detection. Returns [(role, confidence)].
         """
-        # Example prompt for LLM:
+        if not self.llm_api_key:
+            raise RuntimeError("MISTRAL_API_KEY not set")
         prompt = (
             "Given the following user message, which executive role (CEO, CFO, CTO, COO, CMO, CIO, CHRO, CSO, CDO, CAO, CLO, CPO, CCO, CRO, CBO, CINO, CDAO, AI Assistant) is best suited to answer? "
-            "Return a JSON list of (role, confidence) pairs.\n"
+            "Return a JSON list of (role, confidence) pairs, sorted by confidence.\n"
             f"Message: {message}"
         )
-        # --- Replace this with actual LLM API call ---
-        # For now, fallback to keyword-based
-        return self.detect_keywords(message)
+        headers = {
+            "Authorization": f"Bearer {self.llm_api_key}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "model": self.llm_model,
+            "messages": [
+                {"role": "system", "content": "You are an intent classifier for a C-suite AI agent system."},
+                {"role": "user", "content": prompt}
+            ],
+            "max_tokens": 256,
+            "temperature": 0.0
+        }
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(self.llm_url, headers=headers, json=data)
+            resp.raise_for_status()
+            result = resp.json()
+            content = result["choices"][0]["message"]["content"]
+            try:
+                parsed = json.loads(content)
+                if isinstance(parsed, list) and all(isinstance(x, list) and len(x) == 2 for x in parsed):
+                    return [(str(role), float(conf)) for role, conf in parsed]
+            except Exception:
+                pass
+            # fallback: try to parse as dict
+            try:
+                parsed = json.loads(content)
+                if isinstance(parsed, dict):
+                    return [(str(role), float(conf)) for role, conf in parsed.items()]
+            except Exception:
+                pass
+            # fallback: keyword
+            return self.detect_keywords(message)
 
     def detect_keywords(self, message: str) -> List[Tuple[str, float]]:
         message_lower = message.lower()
