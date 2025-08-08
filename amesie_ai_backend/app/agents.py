@@ -1,11 +1,8 @@
 from typing import List, Dict, Callable, Any, Optional
-from collections import deque
 from app.tools import ToolRegistry
+from app.memory import persistent_memory
 
 class Agent:
-    """
-    Role-specific agent with independent memory, system prompt, and tool usage.
-    """
     def __init__(
         self,
         role: str,
@@ -16,40 +13,47 @@ class Agent:
         self.role = role
         self.system_prompt = system_prompt
         self.tools = tools or []
-        self.memory = deque(maxlen=memory_limit)  # [(user, message), (agent, message)]
+        self.memory_limit = memory_limit
         self.tool_registry = ToolRegistry()
 
-    def add_to_memory(self, sender: str, message: str):
-        self.memory.append((sender, message))
+    async def add_to_memory(self, sender: str, message: str):
+        await persistent_memory.add(self.role, sender, message)
 
-    def get_memory(self) -> List[Dict[str, str]]:
-        return [{"sender": sender, "message": msg} for sender, msg in self.memory]
+    async def get_memory(self) -> List[Dict[str, str]]:
+        mem = await persistent_memory.get(self.role, self.memory_limit)
+        return [{"sender": sender, "message": msg} for sender, msg in mem]
 
-    def clear_memory(self):
-        self.memory.clear()
+    async def clear_memory(self):
+        await persistent_memory.clear(self.role)
 
     def call_tool(self, tool_name: str, *args, **kwargs) -> Any:
         if tool_name not in self.tools:
             raise PermissionError(f"Agent '{self.role}' cannot use tool '{tool_name}'")
         return self.tool_registry.call(tool_name, *args, **kwargs)
 
-    async def generate_response(self, user_message: str) -> str:
+    async def generate_response(self, user_message: str, orchestrator=None) -> str:
         """
         Compose the prompt using system prompt, memory, and user message,
         then call the Mistral model (stubbed here).
+        If orchestrator is provided, can call other agents.
         """
         prompt = self.system_prompt + "\n"
-        for mem in self.get_memory():
+        for mem in await self.get_memory():
             prompt += f"{mem['sender']}: {mem['message']}\n"
         prompt += f"User: {user_message}\n{self.role}:"
-        self.add_to_memory("User", user_message)
+        await self.add_to_memory("User", user_message)
+        # Example: agent-to-agent call
+        if orchestrator and "[ask CFO]" in user_message:
+            cfo = orchestrator.get_agent("CFO")
+            cfo_response = await cfo.generate_response(user_message.replace("[ask CFO]", ""), orchestrator)
+            await self.add_to_memory("CFO", cfo_response)
+            prompt += f"\nCFO: {cfo_response}\n{self.role}:"
         response = await self.call_mistral(prompt)
-        self.add_to_memory(self.role, response)
+        await self.add_to_memory(self.role, response)
         return response
 
     async def call_mistral(self, prompt: str) -> str:
         # Replace with your actual Mistral integration
-        # Example: return await model_service.generate_text(prompt=prompt, ...)
         return f"[{self.role} would respond here based on prompt: {prompt[:60]}...]"
 
 # Role-specific agent configs
@@ -70,9 +74,6 @@ AGENT_CONFIGS = {
 }
 
 class AgentRegistry:
-    """
-    Registry for all agents by role name.
-    """
     def __init__(self):
         self.agents: Dict[str, Agent] = {
             role: Agent(role, **cfg) for role, cfg in AGENT_CONFIGS.items()

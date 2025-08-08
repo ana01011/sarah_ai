@@ -1,34 +1,39 @@
-from typing import Optional
 from app.agents import agent_registry, Agent
+from app.intent import intent_detector
 
 class Orchestrator:
-    """
-    Orchestrator agent (CEO) that delegates queries to the appropriate agent based on message content.
-    """
     def __init__(self):
-        self.ceo = agent_registry.get("CEO")
-        self.cfo = agent_registry.get("CFO")
-        self.cto = agent_registry.get("CTO")
-        # Add more as needed
+        self.agent_registry = agent_registry
+
+    def get_agent(self, role: str) -> Agent:
+        return self.agent_registry.get(role)
 
     async def route(self, user_message: str) -> str:
         """
-        Analyze the message and delegate to the appropriate agent.
-        CEO summarizes and responds to the user.
+        Use intent detection to select agent(s), support agent-to-agent chat.
         """
-        msg_lower = user_message.lower()
-        if any(word in msg_lower for word in ["finance", "budget", "revenue", "profit", "loss", "projection", "expense", "cost"]):
-            # Delegate to CFO
-            cfo_response = await self.cfo.generate_response(user_message)
-            summary = await self.ceo.generate_response(f"The CFO said: {cfo_response}. Summarize for the user.")
-            return summary
-        elif any(word in msg_lower for word in ["tech", "technology", "stack", "deploy", "engineer", "architecture", "software", "platform"]):
-            # Delegate to CTO
-            cto_response = await self.cto.generate_response(user_message)
-            summary = await self.ceo.generate_response(f"The CTO said: {cto_response}. Summarize for the user.")
-            return summary
-        else:
-            # CEO handles directly
-            return await self.ceo.generate_response(user_message)
+        intents = intent_detector.detect(user_message)
+        if not intents:
+            # Default to CEO
+            agent = self.get_agent("CEO")
+            return await agent.generate_response(user_message, orchestrator=self)
+        # If high confidence, route to that agent
+        top_role, confidence = intents[0]
+        if confidence > 0.5:
+            agent = self.get_agent(top_role)
+            return await agent.generate_response(user_message, orchestrator=self)
+        # If ambiguous, CEO delegates and summarizes
+        ceo = self.get_agent("CEO")
+        responses = []
+        for role, conf in intents:
+            if conf > 0.2:
+                agent = self.get_agent(role)
+                resp = await agent.generate_response(user_message, orchestrator=self)
+                responses.append(f"{role}: {resp}")
+        summary = await ceo.generate_response(
+            f"Multiple agents responded: {' | '.join(responses)}. Summarize for the user.",
+            orchestrator=self
+        )
+        return summary
 
 orchestrator = Orchestrator()

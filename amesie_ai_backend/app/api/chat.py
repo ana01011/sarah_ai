@@ -27,9 +27,14 @@ async def chat_with_agent(request: ChatRequest):
             agent = agent_registry.get(request.role)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
-        response = await agent.generate_response(request.message)
+        try:
+            response = await agent.generate_response(request.message, orchestrator=orchestrator)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Agent error: {e}")
         return ChatResponse(role=request.role, response=response)
     else:
-        # Use orchestrator
-        response = await orchestrator.route(request.message)
+        try:
+            response = await orchestrator.route(request.message)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Orchestrator error: {e}")
         return ChatResponse(role="CEO", response=response)

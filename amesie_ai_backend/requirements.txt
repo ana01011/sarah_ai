@@ -32,3 +32,4 @@ dash==2.14.2
 dash-bootstrap-components==1.5.0
 gunicorn==21.2.0
 supervisor==4.2.5
+asyncpg==0.30.0
