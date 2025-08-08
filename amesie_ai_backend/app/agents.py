@@ -32,17 +32,11 @@ class Agent:
         return self.tool_registry.call(tool_name, *args, **kwargs)
 
     async def generate_response(self, user_message: str, orchestrator=None) -> str:
-        """
-        Compose the prompt using system prompt, memory, and user message,
-        then call the Mistral model (stubbed here).
-        If orchestrator is provided, can call other agents.
-        """
         prompt = self.system_prompt + "\n"
         for mem in await self.get_memory():
             prompt += f"{mem['sender']}: {mem['message']}\n"
         prompt += f"User: {user_message}\n{self.role}:"
         await self.add_to_memory("User", user_message)
-        # Example: agent-to-agent call
         if orchestrator and "[ask CFO]" in user_message:
             cfo = orchestrator.get_agent("CFO")
             cfo_response = await cfo.generate_response(user_message.replace("[ask CFO]", ""), orchestrator)
@@ -53,24 +47,28 @@ class Agent:
         return response
 
     async def call_mistral(self, prompt: str) -> str:
-        # Replace with your actual Mistral integration
         return f"[{self.role} would respond here based on prompt: {prompt[:60]}...]"
 
-# Role-specific agent configs
+# Role-specific agent configs (all C-suite + AI Assistant)
 AGENT_CONFIGS = {
-    "CEO": {
-        "system_prompt": "You are the CEO. You have a strategic, high-level view and can delegate to other executives.",
-        "tools": [],
-    },
-    "CFO": {
-        "system_prompt": "You are the CFO. You are an expert in finance, accounting, and projections.",
-        "tools": ["financial_projection", "budget_analysis"],
-    },
-    "CTO": {
-        "system_prompt": "You are the CTO. You are an expert in technology, engineering, and product development.",
-        "tools": ["tech_stack_advice", "project_timeline"],
-    },
-    # Add more roles as needed
+    "CEO": {"system_prompt": "You are the CEO. Strategic, high-level, visionary, and can delegate to other executives.", "tools": []},
+    "CFO": {"system_prompt": "You are the CFO. Expert in finance, accounting, projections, and financial strategy.", "tools": ["financial_projection", "budget_analysis"]},
+    "CTO": {"system_prompt": "You are the CTO. Expert in technology, engineering, product development, and IT strategy.", "tools": ["tech_stack_advice", "project_timeline"]},
+    "COO": {"system_prompt": "You are the COO. Expert in operations, process optimization, logistics, and execution.", "tools": []},
+    "CMO": {"system_prompt": "You are the CMO. Expert in marketing, branding, campaigns, and customer acquisition.", "tools": []},
+    "CIO": {"system_prompt": "You are the CIO. Expert in information systems, IT infrastructure, and digital transformation.", "tools": []},
+    "CHRO": {"system_prompt": "You are the CHRO. Expert in HR, talent, culture, and employee engagement.", "tools": []},
+    "CSO": {"system_prompt": "You are the CSO. Expert in security, risk, compliance, and cyber protection.", "tools": []},
+    "CDO": {"system_prompt": "You are the CDO. Expert in data, governance, and data quality.", "tools": []},
+    "CAO": {"system_prompt": "You are the CAO. Expert in analytics, reporting, KPIs, and business insights.", "tools": []},
+    "CLO": {"system_prompt": "You are the CLO. Expert in legal, contracts, regulation, and intellectual property.", "tools": []},
+    "CPO": {"system_prompt": "You are the CPO. Expert in product management, design, UX, and releases.", "tools": []},
+    "CCO": {"system_prompt": "You are the CCO. Expert in customer service, support, and satisfaction.", "tools": []},
+    "CRO": {"system_prompt": "You are the CRO. Expert in revenue, sales, pipeline, and forecasting.", "tools": []},
+    "CBO": {"system_prompt": "You are the CBO. Expert in business development, partnerships, and alliances.", "tools": []},
+    "CINO": {"system_prompt": "You are the CINO. Expert in innovation, R&D, and disruptive ideas.", "tools": []},
+    "CDAO": {"system_prompt": "You are the CDAO. Expert in digital, analytics, AI, and automation.", "tools": []},
+    "AI Assistant": {"system_prompt": "You are Sarah, the advanced AI assistant. You help with any general or cross-domain question, and can route to the right executive if needed.", "tools": []},
 }
 
 class AgentRegistry:

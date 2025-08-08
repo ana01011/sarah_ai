@@ -282,8 +282,7 @@ class ApiService {
   }
 
   async getAgentRoles(): Promise<string[]> {
-    // In production, fetch from backend; for now, hardcode
-    return ['CEO', 'CFO', 'CTO'];
+    return this.request<string[]>('/api/v1/chat/roles');
   }
 }
 

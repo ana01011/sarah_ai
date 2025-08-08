@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from app.agents import agent_registry
 from app.orchestrator import orchestrator
 
@@ -38,3 +38,7 @@ async def chat_with_agent(request: ChatRequest):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Orchestrator error: {e}")
         return ChatResponse(role="CEO", response=response)
+
+@router.get("/roles", response_model=List[str])
+async def get_agent_roles():
+    return agent_registry.all_roles()
