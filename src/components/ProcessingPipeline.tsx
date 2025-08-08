@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Database, Cpu, Brain, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { apiService, type ProcessingPipelineMetrics } from '../services/api';
 
 interface PipelineStage {
   id: string;
@@ -11,12 +12,38 @@ interface PipelineStage {
 }
 
 export const ProcessingPipeline: React.FC = () => {
-  const [stages, setStages] = useState<PipelineStage[]>([
-    { id: 'ingest', name: 'Data Ingestion', status: 'completed', progress: 100, throughput: 1247, icon: Database },
+  const [stages, setStages] = useState<PipelineStage[]>([{
+    id: 'ingest', name: 'Data Ingestion', status: 'completed', progress: 100, throughput: 1247, icon: Database },
     { id: 'preprocess', name: 'Preprocessing', status: 'processing', progress: 67, throughput: 892, icon: Cpu },
     { id: 'training', name: 'Model Training', status: 'processing', progress: 43, throughput: 156, icon: Brain },
     { id: 'validation', name: 'Validation', status: 'waiting', progress: 0, throughput: 0, icon: CheckCircle },
   ]);
+  const [pipelineStats, setPipelineStats] = useState<{ totalProcessed: string; successRate: string }>({ totalProcessed: '847.2K', successRate: '99.7%' });
+
+  useEffect(() => {
+    // Fetch pipeline metrics from backend
+    apiService.getProcessingPipelineMetrics()
+      .then((metrics: ProcessingPipelineMetrics) => {
+        // Map backend data to local stage format
+        if (metrics && metrics.stages) {
+          setStages(metrics.stages.map((stage, idx) => ({
+            id: stage.name.toLowerCase().replace(/\s+/g, '-'),
+            name: stage.name,
+            status: stage.status === 'active' ? 'processing' : (stage.status as any),
+            progress: Math.round(stage.efficiency),
+            throughput: stage.throughput,
+            icon: [Database, Cpu, Brain, CheckCircle][idx % 4],
+          })));
+          setPipelineStats({
+            totalProcessed: metrics.total_throughput?.toLocaleString() || 'N/A',
+            successRate: metrics.overall_efficiency ? metrics.overall_efficiency.toFixed(1) + '%' : 'N/A',
+          });
+        }
+      })
+      .catch(() => {
+        // fallback to simulated data
+      });
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -24,7 +51,6 @@ export const ProcessingPipeline: React.FC = () => {
         if (stage.status === 'processing') {
           const newProgress = Math.min(100, stage.progress + Math.random() * 3);
           const newStatus = newProgress === 100 ? 'completed' : 'processing';
-          
           return {
             ...stage,
             progress: newProgress,
@@ -32,20 +58,17 @@ export const ProcessingPipeline: React.FC = () => {
             throughput: stage.throughput + Math.floor((Math.random() - 0.5) * 50)
           };
         }
-        
         if (stage.status === 'waiting' && prev.find(s => s.id === getNextStage(stage.id))?.status === 'completed') {
           return { ...stage, status: 'processing', progress: 1 };
         }
-        
         return stage;
       }));
     }, 2000);
-
     return () => clearInterval(interval);
   }, []);
 
   const getNextStage = (currentId: string) => {
-    const stageOrder = ['ingest', 'preprocess', 'training', 'validation'];
+    const stageOrder = stages.map(s => s.id);
     const currentIndex = stageOrder.indexOf(currentId);
     return stageOrder[currentIndex - 1];
   };
@@ -86,7 +109,6 @@ export const ProcessingPipeline: React.FC = () => {
       <div className="space-y-4">
         {stages.map((stage, index) => {
           const Icon = stage.icon;
-          
           return (
             <div key={stage.id} className="relative">
               <div className={`
@@ -104,13 +126,11 @@ export const ProcessingPipeline: React.FC = () => {
                     </div>
                     <span className="text-sm font-medium text-white">{stage.name}</span>
                   </div>
-                  
                   <div className="text-right">
                     <p className="text-xs text-slate-400">Throughput</p>
                     <p className="text-sm font-mono text-white">{stage.throughput.toLocaleString()}/s</p>
                   </div>
                 </div>
-
                 {/* Progress Bar */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs text-slate-400">
@@ -129,7 +149,6 @@ export const ProcessingPipeline: React.FC = () => {
                   </div>
                 </div>
               </div>
-
               {/* Arrow connector */}
               {index < stages.length - 1 && (
                 <div className="flex justify-center my-2">
@@ -140,17 +159,16 @@ export const ProcessingPipeline: React.FC = () => {
           );
         })}
       </div>
-
       {/* Pipeline Stats */}
       <div className="mt-6 pt-6 border-t border-white/10">
         <div className="grid grid-cols-2 gap-4">
           <div className="text-center">
             <p className="text-xs text-slate-400">Total Processed</p>
-            <p className="text-lg font-mono text-emerald-400">847.2K</p>
+            <p className="text-lg font-mono text-emerald-400">{pipelineStats.totalProcessed}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-slate-400">Success Rate</p>
-            <p className="text-lg font-mono text-emerald-400">99.7%</p>
+            <p className="text-lg font-mono text-emerald-400">{pipelineStats.successRate}</p>
           </div>
         </div>
       </div>

@@ -1,9 +1,32 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Brain, Layers, Zap } from 'lucide-react';
+import { apiService, type NeuralNetworkMetrics } from '../services/api';
 
 export const NeuralNetworkViz: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
+  const [stats, setStats] = useState<NeuralNetworkMetrics | null>(null);
+
+  useEffect(() => {
+    // Fetch neural network stats from backend
+    apiService.getNeuralNetworkMetrics()
+      .then(setStats)
+      .catch(() => {
+        // fallback to hardcoded values
+        setStats({
+          layers: [
+            { name: 'Input Layer', neurons: 4, activation: 'Linear' },
+            { name: 'Hidden Layer 1', neurons: 6, activation: 'ReLU' },
+            { name: 'Hidden Layer 2', neurons: 6, activation: 'ReLU' },
+            { name: 'Output Layer', neurons: 3, activation: 'Softmax' },
+          ],
+          total_parameters: '2.1M',
+          model_size: '14.5GB',
+          quantization: '4-bit',
+          memory_efficiency: '85%'
+        });
+      });
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -115,7 +138,6 @@ export const NeuralNetworkViz: React.FC = () => {
           className="w-full h-64 rounded-lg"
           style={{ width: '100%', height: '256px' }}
         />
-        
         {/* Layer labels */}
         <div className="absolute bottom-2 left-0 right-0 flex justify-between px-4">
           <span className="text-xs text-slate-400">Input</span>
@@ -130,17 +152,17 @@ export const NeuralNetworkViz: React.FC = () => {
         <div className="text-center">
           <Layers className="w-5 h-5 text-emerald-400 mx-auto mb-1" />
           <p className="text-xs text-slate-400">Layers</p>
-          <p className="text-sm font-mono text-white">4</p>
+          <p className="text-sm font-mono text-white">{stats ? stats.layers.length : '...'}</p>
         </div>
         <div className="text-center">
           <Zap className="w-5 h-5 text-amber-400 mx-auto mb-1" />
           <p className="text-xs text-slate-400">Parameters</p>
-          <p className="text-sm font-mono text-white">2.1M</p>
+          <p className="text-sm font-mono text-white">{stats ? stats.total_parameters : '...'}</p>
         </div>
         <div className="text-center">
           <Brain className="w-5 h-5 text-purple-400 mx-auto mb-1" />
           <p className="text-xs text-slate-400">Neurons</p>
-          <p className="text-sm font-mono text-white">19</p>
+          <p className="text-sm font-mono text-white">{stats ? stats.layers.reduce((sum, l) => sum + l.neurons, 0) : '...'}</p>
         </div>
       </div>
     </div>
