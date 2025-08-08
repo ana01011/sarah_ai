@@ -61,12 +61,9 @@ async def lifespan(app: FastAPI):
 
 # Create FastAPI app
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    version=settings.APP_VERSION,
-    description="Production-ready AI backend with Mistral 7B quantized model",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    lifespan=lifespan
+    title="Amesie AI Backend with Agentification",
+    description="Production-grade agent system with role-based agents and orchestration.",
+    version="2.0.0"
 )
 
 # Add middleware

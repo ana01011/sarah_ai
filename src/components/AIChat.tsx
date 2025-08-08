@@ -30,7 +30,7 @@ import {
   Shield,
   Star
 } from 'lucide-react';
-import { apiService } from '../services/api';
+import { apiService, AgentChatRequest, AgentChatResponse } from '../services/api';
 
 interface Message {
   id: string;
@@ -75,6 +75,12 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [agentRoles, setAgentRoles] = useState<string[]>([]);
+
+  useEffect(() => {
+    apiService.getAgentRoles().then(setAgentRoles);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -113,44 +119,30 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
     setIsTyping(true);
 
     try {
-      // Send request to backend
-      const response = await apiService.generateConversation({
-        prompt: inputValue,
-        max_length: 2048,
-        temperature: 0.7,
-        top_p: 0.9,
-        top_k: 50
-      });
-
+      // Send to agent chat API
+      const req: AgentChatRequest = { role: selectedRole || undefined, message: inputValue };
+      const response: AgentChatResponse = await apiService.sendAgentChat(req);
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: response.text,
-        sender: 'ai',
+        content: response.response,
+        sender: response.role as any,
         timestamp: new Date(),
-        suggestions: [
-          "📊 Show detailed metrics",
-          "⚡ Apply optimizations", 
-          "📋 Export report",
-          "🔧 Schedule maintenance"
-        ],
+        suggestions: [],
         reactions: [
           { type: '👍', count: 0 },
           { type: '❤️', count: 0 },
           { type: '🚀', count: 0 }
         ]
       };
-
       setMessages(prev => [...prev, aiMessage]);
       setIsTyping(false);
       playSound('receive');
     } catch (error) {
       console.error('Failed to generate response:', error);
-      
-      // Fallback response
       const fallbackMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I apologize, but I'm having trouble connecting to the AI model right now. Please try again in a moment, or check if the backend service is running.",
-        sender: 'ai',
+        content: "I apologize, but I'm having trouble connecting to the AI agent system right now. Please try again in a moment, or check if the backend service is running.",
+        sender: 'AI',
         timestamp: new Date(),
         suggestions: ["🔄 Try again", "📊 Check system status", "🔧 Restart service"],
         reactions: [
@@ -159,7 +151,6 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
           { type: '🚀', count: 0 }
         ]
       };
-
       setMessages(prev => [...prev, fallbackMessage]);
       setIsTyping(false);
       playSound('receive');
@@ -458,6 +449,19 @@ export const AIChat: React.FC<AIChatProps> = ({ isOpen, onClose }) => {
 
           {/* Enhanced Input */}
           <div className="p-3 sm:p-6 border-t border-white/10 bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-md">
+            <div className="mb-2 flex items-center space-x-2">
+              <label className="text-xs text-slate-400">Agent Role:</label>
+              <select
+                value={selectedRole || ''}
+                onChange={e => setSelectedRole(e.target.value || null)}
+                className="border rounded px-2 py-1 text-xs"
+              >
+                <option value="">Orchestrator (Auto)</option>
+                {agentRoles.map(role => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </select>
+            </div>
             <div className="flex items-center space-x-2 sm:space-x-4 mb-3 sm:mb-4">
               <div className="flex-1 relative group">
                 <input

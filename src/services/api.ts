@@ -83,6 +83,17 @@ export interface ProcessingPipelineMetrics {
   total_latency: number;
 }
 
+// Agent chat API
+export interface AgentChatRequest {
+  role?: string;
+  message: string;
+}
+
+export interface AgentChatResponse {
+  role: string;
+  response: string;
+}
+
 class ApiService {
   private baseUrl: string;
 
@@ -261,6 +272,18 @@ class ApiService {
     };
   }> {
     return this.request('/api/v1/info');
+  }
+
+  async sendAgentChat(request: AgentChatRequest): Promise<AgentChatResponse> {
+    return this.request<AgentChatResponse>('/api/v1/chat', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async getAgentRoles(): Promise<string[]> {
+    // In production, fetch from backend; for now, hardcode
+    return ['CEO', 'CFO', 'CTO'];
   }
 }
 
