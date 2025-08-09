@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import { apiService } from '../services/api';
 import { 
   MessageCircle, 
   Send, 
@@ -141,34 +142,24 @@ export const AIChat: React.FC<AIChatProps> = ({
     setInputValue('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      const aiResponses = [
-        {
-          content: "I've analyzed your request and found some interesting insights! 🚀 Your GPU utilization is at 78% with excellent model performance. The neural networks are processing data efficiently with 94.7% accuracy. I've also detected optimization opportunities that could boost performance by 15%.",
-          suggestions: ["📊 Show detailed metrics", "⚡ Apply optimizations", "📋 Export report", "🔧 Schedule maintenance"]
-        },
-        {
-          content: "you mean my font? haha what do you think it is not good or do you have a better suggestion?",
-          suggestions: ["🚀 change font", "📈 View font details", " suggest a font", "💾 upload a new font"]
-        },
-        {
-          content: "I'm monitoring 12 active models across your GPU clusters. 🧠 Model accuracy has improved by 2.3% over the last hour! The transformer models are showing particularly strong performance. Would you like me to generate a detailed performance report or suggest parameter adjustments?",
-          suggestions: ["📊 Generate report", "🔧 Adjust parameters", "⚖️ Compare models", "🎯 Set alerts"]
-        },
-        {
-          content: "Great! I can help you with code generation. 💻 What type of code would you like me to create? I can generate Python scripts for data processing, neural network architectures, API endpoints, or even complete applications. Just describe what you need!",
-          suggestions: ["🐍 Python scripts", "🧠 Neural networks", "🌐 API endpoints", "📱 Full applications"]
-        }
-      ];
+    try {
+      // Send message to backend API
+      const response = await apiService.sendChatMessage({
+        message: inputValue,
+        agent: agentContext?.name || 'AI Assistant',
+        context: agentContext ? {
+          role: agentContext.role,
+          department: agentContext.department,
+          specialties: agentContext.specialties
+        } : undefined
+      });
 
-      const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
-      
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: randomResponse.content,
+        content: response.response,
         sender: 'ai',
-        timestamp: new Date(),
-        suggestions: randomResponse.suggestions,
+        timestamp: new Date(response.timestamp),
+        suggestions: response.suggestions,
         reactions: [
           { type: '👍', count: 0 },
           { type: '❤️', count: 0 },
@@ -179,7 +170,46 @@ export const AIChat: React.FC<AIChatProps> = ({
       setMessages(prev => [...prev, aiMessage]);
       setIsTyping(false);
       playSound('receive');
-    }, 1500);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Fallback to local responses if API fails
+      setTimeout(() => {
+        const aiResponses = [
+          {
+            content: "I've analyzed your request and found some interesting insights! 🚀 Your GPU utilization is at 78% with excellent model performance. The neural networks are processing data efficiently with 94.7% accuracy. I've also detected optimization opportunities that could boost performance by 15%.",
+            suggestions: ["📊 Show detailed metrics", "⚡ Apply optimizations", "📋 Export report", "🔧 Schedule maintenance"]
+          },
+          {
+            content: "I'm monitoring 12 active models across your GPU clusters. 🧠 Model accuracy has improved by 2.3% over the last hour! The transformer models are showing particularly strong performance. Would you like me to generate a detailed performance report or suggest parameter adjustments?",
+            suggestions: ["📊 Generate report", "🔧 Adjust parameters", "⚖️ Compare models", "🎯 Set alerts"]
+          },
+          {
+            content: "Great! I can help you with code generation. 💻 What type of code would you like me to create? I can generate Python scripts for data processing, neural network architectures, API endpoints, or even complete applications. Just describe what you need!",
+            suggestions: ["🐍 Python scripts", "🧠 Neural networks", "🌐 API endpoints", "📱 Full applications"]
+          }
+        ];
+
+        const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
+        
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: randomResponse.content,
+          sender: 'ai',
+          timestamp: new Date(),
+          suggestions: randomResponse.suggestions,
+          reactions: [
+            { type: '👍', count: 0 },
+            { type: '❤️', count: 0 },
+            { type: '🚀', count: 0 }
+          ]
+        };
+
+        setMessages(prev => [...prev, aiMessage]);
+        setIsTyping(false);
+        playSound('receive');
+      }, 1500);
+    }
   };
 
   const handleSuggestionClick = (suggestion: string) => {

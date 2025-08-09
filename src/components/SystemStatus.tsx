@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Server, Cpu, HardDrive, Wifi, AlertTriangle, CheckCircle } from 'lucide-react';
+import { apiService, type SystemComponent } from '../services/api';
 
-interface SystemComponent {
-  name: string;
-  status: 'online' | 'warning' | 'offline';
-  uptime: string;
-  load: number;
-}
+
 
 export const SystemStatus: React.FC = () => {
   const [components, setComponents] = useState<SystemComponent[]>([
@@ -19,11 +15,30 @@ export const SystemStatus: React.FC = () => {
   ]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setComponents(prev => prev.map(comp => ({
-        ...comp,
-        load: Math.max(10, Math.min(100, comp.load + (Math.random() - 0.5) * 10))
-      })));
+    // Fetch initial system status
+    const fetchSystemStatus = async () => {
+      try {
+        const status = await apiService.getSystemStatus();
+        setComponents(status.components);
+      } catch (error) {
+        console.error('Error fetching system status:', error);
+      }
+    };
+    fetchSystemStatus();
+
+    // Update system status periodically
+    const interval = setInterval(async () => {
+      try {
+        const status = await apiService.getSystemStatus();
+        setComponents(status.components);
+      } catch (error) {
+        console.error('Error updating system status:', error);
+        // Fall back to simulated updates if backend is down
+        setComponents(prev => prev.map(comp => ({
+          ...comp,
+          load: Math.max(10, Math.min(100, comp.load + (Math.random() - 0.5) * 10))
+        })));
+      }
     }, 3000);
 
     return () => clearInterval(interval);
