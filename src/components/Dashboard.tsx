@@ -9,6 +9,7 @@ import { SystemStatus } from './SystemStatus';
 import { ProcessingPipeline } from './ProcessingPipeline';
 import { AIChat } from './AIChat';
 import { useAgent } from '../contexts/AgentContext';
+import { apiService, type SystemMetrics, type DashboardStats } from '../services/api';
 
 interface DashboardProps {
   onBackToWelcome?: () => void;
@@ -20,32 +21,85 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBackToWelcome }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [notifications, setNotifications] = useState(3);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [aiMetrics, setAiMetrics] = useState({
+  const [aiMetrics, setAiMetrics] = useState<SystemMetrics>({
     accuracy: 94.7,
     throughput: 2847,
     latency: 12.3,
     gpuUtilization: 78,
     memoryUsage: 65,
-    activeModels: 12
+    activeModels: 12,
+    uptime: 99.97,
+    deployments: 247,
+    codeQuality: 94.3,
+    security: 98.1
   });
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+    activeUsers: 1247,
+    globalReach: 47,
+    dataProcessed: '2.4TB',
+    uptime: '99.98%',
+    timestamp: new Date().toISOString()
+  });
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     
-    const metricsTimer = setInterval(() => {
-      setAiMetrics(prev => ({
-        accuracy: prev.accuracy + (Math.random() - 0.5) * 0.2,
-        throughput: prev.throughput + Math.floor((Math.random() - 0.5) * 100),
-        latency: Math.max(8, prev.latency + (Math.random() - 0.5) * 2),
-        gpuUtilization: Math.max(0, Math.min(100, prev.gpuUtilization + (Math.random() - 0.5) * 5)),
-        memoryUsage: Math.max(0, Math.min(100, prev.memoryUsage + (Math.random() - 0.5) * 3)),
-        activeModels: prev.activeModels + Math.floor((Math.random() - 0.5) * 2)
-      }));
+    // Check backend health on mount
+    const checkBackend = async () => {
+      const isHealthy = await apiService.checkHealth();
+      setIsBackendConnected(isHealthy);
+    };
+    checkBackend();
+    
+    // Fetch initial data
+    const fetchInitialData = async () => {
+      try {
+        const [metrics, stats] = await Promise.all([
+          apiService.getMetrics(),
+          apiService.getDashboardStats()
+        ]);
+        setAiMetrics(metrics);
+        setDashboardStats(stats);
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+      }
+    };
+    fetchInitialData();
+    
+    // Set up periodic updates
+    const metricsTimer = setInterval(async () => {
+      try {
+        const metrics = await apiService.getMetrics();
+        setAiMetrics(metrics);
+      } catch (error) {
+        console.error('Error fetching metrics:', error);
+        // Fall back to simulated updates if backend is down
+        setAiMetrics(prev => ({
+          ...prev,
+          accuracy: prev.accuracy + (Math.random() - 0.5) * 0.2,
+          throughput: prev.throughput + Math.floor((Math.random() - 0.5) * 100),
+          latency: Math.max(8, prev.latency + (Math.random() - 0.5) * 2),
+          gpuUtilization: Math.max(0, Math.min(100, prev.gpuUtilization + (Math.random() - 0.5) * 5)),
+          memoryUsage: Math.max(0, Math.min(100, prev.memoryUsage + (Math.random() - 0.5) * 3)),
+          activeModels: prev.activeModels + Math.floor((Math.random() - 0.5) * 2)
+        }));
+      }
     }, 2000);
+    
+    const statsTimer = setInterval(async () => {
+      try {
+        const stats = await apiService.getDashboardStats();
+        setDashboardStats(stats);
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+      }
+    }, 5000);
 
     return () => {
       clearInterval(timer);
       clearInterval(metricsTimer);
+      clearInterval(statsTimer);
     };
   }, []);
 
@@ -255,8 +309,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBackToWelcome }) => {
               </div>
               
               <div className="flex items-center space-x-2 hidden md:flex">
-                <CheckCircle className="w-4 h-4" style={{ color: currentTheme.colors.success }} />
-                <span className="text-xs sm:text-sm" style={{ color: currentTheme.colors.success }}>All Systems Operational</span>
+                {isBackendConnected ? (
+                  <>
+                    <CheckCircle className="w-4 h-4" style={{ color: currentTheme.colors.success }} />
+                    <span className="text-xs sm:text-sm" style={{ color: currentTheme.colors.success }}>Backend Connected</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertTriangle className="w-4 h-4" style={{ color: currentTheme.colors.warning }} />
+                    <span className="text-xs sm:text-sm" style={{ color: currentTheme.colors.warning }}>Backend Offline (Demo Mode)</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -295,7 +358,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBackToWelcome }) => {
                 <Users className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: currentTheme.colors.primary }} />
                 <span className="text-xs sm:text-sm" style={{ color: currentTheme.colors.textSecondary }}>Active Users</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold font-mono" style={{ color: currentTheme.colors.text }}>1,247</p>
+              <p className="text-lg sm:text-2xl font-bold font-mono" style={{ color: currentTheme.colors.text }}>{dashboardStats.activeUsers.toLocaleString()}</p>
               <p className="text-xs" style={{ color: currentTheme.colors.success }}>+12% today</p>
             </div>
             <div className="text-center group cursor-pointer hover:scale-105 transition-transform duration-200">
@@ -303,7 +366,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBackToWelcome }) => {
                 <Globe className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: currentTheme.colors.secondary }} />
                 <span className="text-xs sm:text-sm" style={{ color: currentTheme.colors.textSecondary }}>Global Reach</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold font-mono" style={{ color: currentTheme.colors.text }}>47</p>
+              <p className="text-lg sm:text-2xl font-bold font-mono" style={{ color: currentTheme.colors.text }}>{dashboardStats.globalReach}</p>
               <p className="text-xs" style={{ color: currentTheme.colors.success }}>countries</p>
             </div>
             <div className="text-center group cursor-pointer hover:scale-105 transition-transform duration-200">
@@ -311,7 +374,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBackToWelcome }) => {
                 <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: currentTheme.colors.accent }} />
                 <span className="text-xs sm:text-sm" style={{ color: currentTheme.colors.textSecondary }}>Data Processed</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold font-mono" style={{ color: currentTheme.colors.text }}>2.4TB</p>
+              <p className="text-lg sm:text-2xl font-bold font-mono" style={{ color: currentTheme.colors.text }}>{dashboardStats.dataProcessed}</p>
               <p className="text-xs" style={{ color: currentTheme.colors.success }}>today</p>
             </div>
             <div className="text-center group cursor-pointer hover:scale-105 transition-transform duration-200">
@@ -319,7 +382,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onBackToWelcome }) => {
                 <Zap className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: currentTheme.colors.info }} />
                 <span className="text-xs sm:text-sm" style={{ color: currentTheme.colors.textSecondary }}>Uptime</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold font-mono" style={{ color: currentTheme.colors.text }}>99.98%</p>
+              <p className="text-lg sm:text-2xl font-bold font-mono" style={{ color: currentTheme.colors.text }}>{dashboardStats.uptime}</p>
               <p className="text-xs" style={{ color: currentTheme.colors.success }}>30 days</p>
             </div>
           </div>
