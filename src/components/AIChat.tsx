@@ -138,88 +138,48 @@ export const AIChat: React.FC<AIChatProps> = ({
     };
 
     setMessages(prev => [...prev, userMessage]);
+    setInputValue('');
     setIsTyping(true);
 
-    const currentInputValue = inputValue;
-    setInputValue('');
-    // Send request to your LLM backend
-    try {
-      const response = await fetch('http://147.93.102.165:8000/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: currentInputValue
-        })
-      });
+    // Simulate AI response with realistic delay
+    setTimeout(() => {
+      const responses = [
+        "I understand your request. Let me analyze the current system metrics and provide you with detailed insights.",
+        "Based on the data patterns I'm observing, here are some key recommendations for optimization.",
+        "I've processed your query and found several interesting correlations in the performance data.",
+        "Let me break down the technical analysis for you with actionable insights.",
+        "I'm detecting some anomalies in the system behavior that require immediate attention.",
+        "The neural network performance shows promising trends. Here's what I recommend for the next phase.",
+        "I've compiled a comprehensive report based on your requirements. Here are the highlights.",
+        "The data suggests we should focus on these critical areas for maximum impact."
+      ];
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('LLM Response:', data);
-        
-        // Create AI message with actual LLM response
-        const aiMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: data.response || data.message || "I'm here to help! How can I assist you?",
-          sender: 'ai',
-          timestamp: new Date(),
-          suggestions: data.suggestions || [
-            "📊 Show system metrics",
-            "⚡ Analyze performance", 
-            "🔧 Optimize settings",
-            "💡 Get recommendations"
-          ],
-          reactions: [
-            { type: '👍', count: 0 },
-            { type: '❤️', count: 0 },
-            { type: '🚀', count: 0 }
-          ]
-        };
+      const suggestions = [
+        "📊 Show detailed metrics",
+        "⚡ Analyze performance trends", 
+        "🔧 Optimize configurations",
+        "💡 Get more recommendations",
+        "📈 Generate reports",
+        "🚀 Deploy improvements"
+      ];
 
-        setMessages(prev => [...prev, aiMessage]);
-        setIsTyping(false);
-        playSound('receive');
-      } else {
-        console.error('Backend error:', response.status);
-        // Fallback message for backend errors
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: "I'm having trouble connecting to my backend right now. Please try again in a moment.",
-          sender: 'ai',
-          timestamp: new Date(),
-          reactions: [
-            { type: '👍', count: 0 },
-            { type: '❤️', count: 0 },
-            { type: '🚀', count: 0 }
-          ]
-        };
-        setMessages(prev => [...prev, errorMessage]);
-        setIsTyping(false);
-      }
-    } catch (error) {
-      console.error('Failed to connect to LLM backend:', error);
-      // Fallback message for connection errors
-      const errorMessage: Message = {
+      const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I'm having trouble connecting to my backend right now. Please try again in a moment.",
+        content: responses[Math.floor(Math.random() * responses.length)],
         sender: 'ai',
         timestamp: new Date(),
-        suggestions: [
-          "📊 View dashboard metrics",
-          "⚙️ Check system status",
-          "💡 Get help"
-        ],
+        suggestions: suggestions.slice(0, 4),
         reactions: [
           { type: '👍', count: 0 },
           { type: '❤️', count: 0 },
           { type: '🚀', count: 0 }
         ]
       };
-      setMessages(prev => [...prev, errorMessage]);
+
+      setMessages(prev => [...prev, aiMessage]);
       setIsTyping(false);
-    }
-    playSound('receive');
+      playSound('receive');
+    }, 1500 + Math.random() * 1000);
   };
 
   const handleSuggestionClick = (suggestion: string) => {
