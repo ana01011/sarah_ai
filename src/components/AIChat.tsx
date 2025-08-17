@@ -144,7 +144,7 @@ export const AIChat: React.FC<AIChatProps> = ({
     setInputValue('');
     // Send request to your LLM backend
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch('http://147.93.102.165:8000/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -227,11 +227,10 @@ export const AIChat: React.FC<AIChatProps> = ({
           { type: '🚀', count: 0 }
         ]
       };
-
       setMessages(prev => [...prev, errorMessage]);
       setIsTyping(false);
-      playSound('receive');
     }
+    playSound('receive');
   };
 
   const handleSuggestionClick = (suggestion: string) => {
