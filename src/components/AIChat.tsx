@@ -150,7 +150,7 @@ export const AIChat: React.FC<AIChatProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: currentInput,
+          message: currentInputValue,
           agent_context: agentContext ? {
             name: agentContext.name,
             role: agentContext.role,
@@ -227,9 +227,9 @@ export const AIChat: React.FC<AIChatProps> = ({
           { type: '🚀', count: 0 }
         ]
       };
+
       setMessages(prev => [...prev, errorMessage]);
       setIsTyping(false);
-    }
       playSound('receive');
     }
   };
