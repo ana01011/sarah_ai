@@ -216,15 +216,7 @@ export const AIChat: React.FC<AIChatProps> = ({
         content: "I'm having trouble connecting to my backend right now. Please try again in a moment.",
         sender: 'ai',
         timestamp: new Date(),
-        reactions: [
-          { type: '👍', count: 0 },
-          { type: '❤️', count: 0 },
-          { type: '🚀', count: 0 }
-        ]
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      setIsTyping(false);
-    }
+        suggestions: [
           "📊 View dashboard metrics",
           "⚙️ Check system status",
           "💡 Get help"
@@ -235,9 +227,9 @@ export const AIChat: React.FC<AIChatProps> = ({
           { type: '🚀', count: 0 }
         ]
       };
-
       setMessages(prev => [...prev, errorMessage]);
       setIsTyping(false);
+    }
       playSound('receive');
     }
   };
