@@ -144,24 +144,13 @@ export const AIChat: React.FC<AIChatProps> = ({
     setInputValue('');
     // Send request to your LLM backend
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch('http://147.93.102.165:8000/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: currentInputValue,
-          agent_context: agentContext ? {
-            name: agentContext.name,
-            role: agentContext.role,
-            department: agentContext.department,
-            specialties: agentContext.specialties,
-            level: agentContext.level
-          } : null,
-          conversation_history: messages.slice(-5).map(msg => ({
-            role: msg.sender === 'user' ? 'user' : 'assistant',
-            content: msg.content
-          }))
+          message: currentInputValue
         })
       });
 
