@@ -138,37 +138,97 @@ export const AIChat: React.FC<AIChatProps> = ({
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      const aiResponses = [
-        {
-          content: "I've analyzed your request and found some interesting insights! 🚀 Your GPU utilization is at 78% with excellent model performance. The neural networks are processing data efficiently with 94.7% accuracy. I've also detected optimization opportunities that could boost performance by 15%.",
-          suggestions: ["📊 Show detailed metrics", "⚡ Apply optimizations", "📋 Export report", "🔧 Schedule maintenance"]
+    const currentInputValue = inputValue;
+    setInputValue('');
+    // Send request to your LLM backend
+    try {
+      const response = await fetch('http://147.93.102.165:8000/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        {
-          content: "you mean my font? haha what do you think it is not good or do you have a better suggestion?",
-          suggestions: ["🚀 change font", "📈 View font details", " suggest a font", "💾 upload a new font"]
-        },
-        {
-          content: "I'm monitoring 12 active models across your GPU clusters. 🧠 Model accuracy has improved by 2.3% over the last hour! The transformer models are showing particularly strong performance. Would you like me to generate a detailed performance report or suggest parameter adjustments?",
-          suggestions: ["📊 Generate report", "🔧 Adjust parameters", "⚖️ Compare models", "🎯 Set alerts"]
-        },
-        {
-          content: "Great! I can help you with code generation. 💻 What type of code would you like me to create? I can generate Python scripts for data processing, neural network architectures, API endpoints, or even complete applications. Just describe what you need!",
-          suggestions: ["🐍 Python scripts", "🧠 Neural networks", "🌐 API endpoints", "📱 Full applications"]
-        }
-      ];
+        body: JSON.stringify({
+          message: currentInput,
+          agent_context: agentContext ? {
+            name: agentContext.name,
+            role: agentContext.role,
+            department: agentContext.department,
+            specialties: agentContext.specialties,
+            level: agentContext.level
+          } : null,
+          conversation_history: messages.slice(-5).map(msg => ({
+            role: msg.sender === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          }))
+        })
+      });
 
-      const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
-      
-      const aiMessage: Message = {
+      if (response.ok) {
+        const data = await response.json();
+        console.log('LLM Response:', data);
+        
+        // Create AI message with actual LLM response
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: data.response || data.message || "I'm here to help! How can I assist you?",
+          sender: 'ai',
+          timestamp: new Date(),
+          suggestions: data.suggestions || [
+            "📊 Show system metrics",
+            "⚡ Analyze performance", 
+            "🔧 Optimize settings",
+            "💡 Get recommendations"
+          ],
+          reactions: [
+            { type: '👍', count: 0 },
+            { type: '❤️', count: 0 },
+            { type: '🚀', count: 0 }
+          ]
+        };
+
+        setMessages(prev => [...prev, aiMessage]);
+        setIsTyping(false);
+        playSound('receive');
+      } else {
+        console.error('Backend error:', response.status);
+        // Fallback message for backend errors
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: "I'm having trouble connecting to my backend right now. Please try again in a moment.",
+          sender: 'ai',
+          timestamp: new Date(),
+          reactions: [
+            { type: '👍', count: 0 },
+            { type: '❤️', count: 0 },
+            { type: '🚀', count: 0 }
+          ]
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        setIsTyping(false);
+      }
+    } catch (error) {
+      console.error('Failed to connect to LLM backend:', error);
+      // Fallback message for connection errors
+      const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: randomResponse.content,
+        content: "I'm having trouble connecting to my backend right now. Please try again in a moment.",
         sender: 'ai',
         timestamp: new Date(),
-        suggestions: randomResponse.suggestions,
+        reactions: [
+          { type: '👍', count: 0 },
+          { type: '❤️', count: 0 },
+          { type: '🚀', count: 0 }
+        ]
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setIsTyping(false);
+    }
+          "📊 View dashboard metrics",
+          "⚙️ Check system status",
+          "💡 Get help"
+        ],
         reactions: [
           { type: '👍', count: 0 },
           { type: '❤️', count: 0 },
@@ -176,10 +236,10 @@ export const AIChat: React.FC<AIChatProps> = ({
         ]
       };
 
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages(prev => [...prev, errorMessage]);
       setIsTyping(false);
       playSound('receive');
-    }, 1500);
+    }
   };
 
   const handleSuggestionClick = (suggestion: string) => {
